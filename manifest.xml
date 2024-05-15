@@ -1,0 +1,16 @@
+<package>
+    <description brief="mars_scene_loader">
+      Library for MARS2 to load scenes.
+    </description>
+	<maintainer>Malte Langosz/malte.langosz@dfki.de</maintainer>
+    <!--depend package="base/types" /-->
+    <depend package="simulation/lib_manager" />
+    <depend package="simulation/cfg_manager" />
+    <depend package="tools/configmaps" />
+    <depend package="simulation/mars2/mars_interfaces" />
+    <depend package="simulation/mars2/mars_graphics" />
+    <depend package="simulation/mars2/mars_ode_collision" />
+    <depend package="envire/envire_core" />
+    <depend package="envire/envire_smurf_loader" />
+    <tags>needs_opt</tags>
+</package>
