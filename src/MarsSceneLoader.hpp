@@ -23,13 +23,13 @@ namespace mars
     namespace mars_scene_loader
     {
 
-        class MapexMarsLoader : public interfaces::LoadSceneInterface,
+        class MarsSceneLoader : public interfaces::LoadSceneInterface,
                                 public cfg_manager::CFGClient
         {
 
         public:
-            MapexMarsLoader(lib_manager::LibManager *theManager); ///< Constructor of the \c class Simulator.
-            virtual ~MapexMarsLoader();
+            MarsSceneLoader(lib_manager::LibManager *theManager); ///< Constructor of the \c class Simulator.
+            virtual ~MarsSceneLoader();
 
             // --- LibInterface ---
             int getLibVersion() const override
@@ -39,7 +39,7 @@ namespace mars
 
             const std::string getLibName() const override
             {
-                return std::string("mapex_mars_loader");
+                return std::string("mars_scene_loader");
             }
 
             bool loadFile(std::string filename, std::string tmpPath,
@@ -68,5 +68,5 @@ namespace mars
             void loadSmurfScene(const std::string &filePath, std::string robotname, utils::Vector pos, utils::Quaternion rot);
         };
 
-    } // end of namespace mapex_mars_loader
+    } // end of namespace mars_scene_loader
 } // end of namespace mars
