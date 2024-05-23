@@ -16,6 +16,7 @@
 #include <lib_manager/LibManager.hpp>
 #include <mars_ode_collision/objects/Object.hpp>
 #include <mars_ode_collision/objects/Heightfield.hpp>
+#include <mars_ode_collision/objects/Mesh.hpp>
 #include <mars_interfaces/terrainStruct.h>
 
 #include <mars_interfaces/Logging.hpp>
@@ -65,7 +66,7 @@ namespace mars
                 LOG_ERROR("MarsSceneLoader: Control center is not set");
                 return;
             }
-            control->loadCenter->loadScene[".smurfs"] = this; // smurf scene
+            ControlCenter::loadCenter->loadScene[".smurfs"] = this; // smurf scene
             std::cout << "MarsSceneLoader added as SMURF loader to LoadCenter" << std::endl;
 
             // search for root collision space that we expect as item under the root frame
@@ -320,6 +321,8 @@ namespace mars
             ConfigMap model = ConfigMap::fromYamlFile(filepath);
             for(auto& node: model["nodelist"])
             {
+                // todo: create envire_types and visual and collision items in graph instead of directly creating
+                //       visual and collision objects
                 ConfigMap config = node;
                 if(robotname != "")
                 {
@@ -347,7 +350,7 @@ namespace mars
                     // todo: add proper path handling
                     nodeData.terrain->srcname = path + "/" + nodeData.terrain->srcname;
                     LOG_ERROR(nodeData.terrain->srcname.c_str());
-                    sim->getControlCenter()->loadCenter->loadHeightmap->readPixelData(nodeData.terrain);
+                    ControlCenter::loadCenter->loadHeightmap->readPixelData(nodeData.terrain);
                     if(!nodeData.terrain->pixelData)
                     {
                         LOG_ERROR("NodeManager::addNode: could not load image for terrain");
@@ -356,9 +359,9 @@ namespace mars
                 nodeData.material.fromConfigMap(&material, "");
                 unsigned long drawID = graphics->addDrawObject(nodeData, showViz);
                 drawIDs.push_back(drawID);
-
+                ode_collision::Object *collisionObject;
                 // TODO: load the node as base type into the graph, add HeightMap type into base type
-                if (nodeData.noPhysical == false)
+                if(nodeData.noPhysical == false)
                 {
                     // check physics type:
                     if(nodeData.terrain)
@@ -371,6 +374,7 @@ namespace mars
                         config["size"]["z"] = config["extend"]["z"];
 
                         ode_collision::Heightfield* collision = (ode_collision::Heightfield*)(globalCollisionSpace->createObject(config, NULL));
+                        collisionObject = collision;
                         if(!collision)
                         {
                             LOG_ERROR("Error creating collision object!");
@@ -382,34 +386,33 @@ namespace mars
                             LOG_ERROR("Error creating heightfield geom!");
                             return;
                         }
-                        collision->setPosition(nodeData.pos);
-                        collision->setRotation(nodeData.rot);
-                        // the position update is applied in updateTransform which is not
-                        // called automatically for static objects
-                        collision->updateTransform();
                     }
-                    // else create smurf item
                     else
                     {
+                        // todo: create collision item in graph instead of collision object directly
                         ConfigMap tmpMap;
                         nodeData.toConfigMap(&tmpMap);
                         tmpMap["type"] = tmpMap["physicmode"];
                         ode_collision::Object* collision = ControlCenter::collision->createObject(tmpMap);
+                        collisionObject = collision;
                         if(!collision)
                         {
                             LOG_ERROR("Error creating mars_yaml collision object!");
                             return;
                         }
-                        if(tmpMap["type"] == "plane")
+                        if(tmpMap["type"] == "mesh")
                         {
-                            fprintf(stderr, "set position of:\n %s\n", tmpMap.toYamlString().c_str());
-                            collision->setPosition(nodeData.pos);
-                            collision->setRotation(nodeData.rot);
-                            // the position update is applied in updateTransform which is not
-                            // called automatically for static objects
-                            collision->updateTransform();
+                            nodeData.filename = pathJoin(path, nodeData.filename);
+                            ControlCenter::loadCenter->loadMesh->getPhysicsFromMesh(&nodeData);
+                            ((ode_collision::Mesh*)collision)->setMeshData(nodeData.mesh);
+                            collision->createGeom();
                         }
                     }
+                    collisionObject->setPosition(nodeData.pos);
+                    collisionObject->setRotation(nodeData.rot);
+                    // the position update is applied in updateTransform which is not
+                    // called automatically for static objects
+                    collisionObject->updateTransform();
                 }
             }
         }
