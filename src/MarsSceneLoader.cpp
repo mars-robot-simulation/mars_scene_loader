@@ -321,7 +321,7 @@ namespace mars
             ConfigMap model = ConfigMap::fromYamlFile(filepath);
             for(auto& node: model["nodelist"])
             {
-                // todo: create envire_types and visual and collision items in graph instead of directly creating
+                // TODO: create envire_types and visual and collision items in graph instead of directly creating
                 //       visual and collision objects
                 ConfigMap config = node;
                 if(robotname != "")
@@ -347,7 +347,7 @@ namespace mars
                 {
                     LOG_ERROR("Load heightmap pixelData...");
                     //nodeData.terrain = new(terrainStruct);
-                    // todo: add proper path handling
+                    // TODO: add proper path handling
                     nodeData.terrain->srcname = path + "/" + nodeData.terrain->srcname;
                     LOG_ERROR(nodeData.terrain->srcname.c_str());
                     ControlCenter::loadCenter->loadHeightmap->readPixelData(nodeData.terrain);
@@ -389,7 +389,7 @@ namespace mars
                     }
                     else
                     {
-                        // todo: create collision item in graph instead of collision object directly
+                        // TODO: create collision item in graph instead of collision object directly
                         ConfigMap tmpMap;
                         nodeData.toConfigMap(&tmpMap);
                         tmpMap["type"] = tmpMap["physicmode"];
@@ -446,7 +446,7 @@ namespace mars
                             cfg->setPropertyValue("Scene", "animations_path", "value", std::string(envmap["animations"]["config_path"]));
                         }
                     }
-                    // todo: I think the terrain propertiens are deprecated
+                    // TODO: I think the terrain propertiens are deprecated
                     //       -> terrain_path is used by particle system to search for configuration file
                     //       -> that will become deprecated with the new particle_system implementation
                     if(envmap.hasKey("terrain"))
