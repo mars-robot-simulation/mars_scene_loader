@@ -41,7 +41,7 @@ namespace mars
         using namespace configmaps;
 
         MarsSceneLoader::MarsSceneLoader(lib_manager::LibManager *theManager) :
-            interfaces::LoadSceneInterface(theManager)
+            interfaces::LoadSceneInterface{theManager}
         {
             cfg = libManager->getLibraryAs<cfg_manager::CFGManagerInterface>("cfg_manager");
             collisionSpaceLoader = libManager->getLibraryAs<ode_collision::CollisionSpaceLoader>("mars_ode_collision");
@@ -60,7 +60,7 @@ namespace mars
 
             // add this plugin as loader to LoadCenter
             // so we can access the loader over LoadCenter according to the supported file extension
-            interfaces::ControlCenter *control = sim->getControlCenter();
+            auto* const control = sim->getControlCenter();
             if (!control)
             {
                 LOG_ERROR("MarsSceneLoader: Control center is not set");
@@ -73,8 +73,8 @@ namespace mars
             globalCollisionSpace = nullptr;
             try
             {
-                envire::core::EnvireGraph::ItemIterator<envire::core::Item<CollisionInterfaceItem>> it = ControlCenter::envireGraph->getItem<envire::core::Item<CollisionInterfaceItem>>(SIM_CENTER_FRAME_NAME);
-                globalCollisionSpace = it->getData().collisionInterface;
+                auto it = ControlCenter::envireGraph->getItem<envire::core::Item<CollisionInterfaceItem>>(SIM_CENTER_FRAME_NAME);
+                globalCollisionSpace = it->getData().collisionInterface.get();
             }
             catch (...)
             {
@@ -87,8 +87,7 @@ namespace mars
             showViz = true;
             if(cfg)
             {
-                showViz = cfg->getOrCreateProperty("Simulator", "visual rep.",
-                                                   (int)1, this).iValue & 1;;
+                showViz = cfg->getOrCreateProperty("Simulator", "visual rep.", (int)1, this).iValue & 1;
             }
         }
 
@@ -119,39 +118,39 @@ namespace mars
             std::cout << "tmpPath: " << tmpPath << std::endl;
             std::cout << "robotname: " << robotname << std::endl;
 
-            std::string fileExtension = utils::getFilenameSuffix(fileName);
-            std::string path = utils::getPathOfFile(fileName);
+            const auto fileExtension = utils::getFilenameSuffix(fileName);
+            const auto path = utils::getPathOfFile(fileName);
             utils::removeFilenamePrefix(&fileName);
-            std::string absoluteFilePath(path + fileName);
+            const auto absoluteFilePath = path + fileName;
 
             std::cout << "absoluteFilePath: " << absoluteFilePath << std::endl;
 
             // currently we handle only yml
             if(fileExtension != ".smurfs")
             {
-                const std::string errmsg = "The MarsSceneLoader does not support the file format: " + fileExtension;
+                const auto errmsg = std::string{"The MarsSceneLoader does not support the file format: "} + fileExtension;
                 LOG_ERROR("%s", errmsg.c_str());
                 return false;
             }
 
-            configmaps::ConfigMap smurfsMap;
-            smurfsMap = configmaps::ConfigMap::fromYamlFile(absoluteFilePath, true);
+            auto smurfsMap = configmaps::ConfigMap::fromYamlFile(absoluteFilePath, true);
             std::cout << "smurfsMap: " << smurfsMap.toJsonString() << std::endl;
 
             // parse the smurfs entries and load them
             configmaps::ConfigVector::iterator it;
             for (it = smurfsMap["entities"].begin(); it != smurfsMap["entities"].end(); ++it)
             {
-                std::string entityFile = (*it)["file"].toString();
-                std::string entityFileExtension = utils::getFilenameSuffix(entityFile);
-                std::string entityFileName = entityFile;
+                auto entityFile = (*it)["file"].toString();
+                auto entityFileExtension = utils::getFilenameSuffix(entityFile);
+                auto entityFileName = entityFile;
                 utils::removeFilenamePrefix(&entityFileName);
                 // handle absolute paths
                 std::string absoluteEntityFilePath;
                 if(entityFile.substr(0,1) == "/")
                 {
                     absoluteEntityFilePath = utils::getPathOfFile(entityFile) + entityFileName;
-                } else
+                }
+                else
                 {
                     absoluteEntityFilePath = path + utils::getPathOfFile(entityFile) + entityFileName;
                 }
@@ -163,14 +162,14 @@ namespace mars
                     robotname = (*it)["name"].toString();
                 }
 
-                utils::Vector pos(0,0,0);
-                utils::Quaternion rot(1,0,0,0);
+                auto pos = utils::Vector{utils::Vector::Zero()};
                 if(it->hasKey("position"))
                 {
                     pos.x() = (*it)["position"][0];
                     pos.y() = (*it)["position"][1];
                     pos.z() = (*it)["position"][2];
                 }
+                auto rot = utils::Quaternion{utils::Quaternion::Identity()};
                 if(it->hasKey("rotation"))
                 {
                     switch ((*it)["rotation"].size())
@@ -195,10 +194,10 @@ namespace mars
                     }
                     case 4:
                     {
-                        rot.x() = (sReal)(*it)["rotation"][1];
-                        rot.y() = (sReal)(*it)["rotation"][2];
-                        rot.z() = (sReal)(*it)["rotation"][3];
-                        rot.w() = (sReal)(*it)["rotation"][0];
+                        rot.x() = static_cast<sReal>((*it)["rotation"][1]);
+                        rot.y() = static_cast<sReal>((*it)["rotation"][2]);
+                        rot.z() = static_cast<sReal>((*it)["rotation"][3]);
+                        rot.w() = static_cast<sReal>((*it)["rotation"][0]);
                         break;
                     }
                     }
@@ -212,14 +211,17 @@ namespace mars
                 {
                     std::cout << "load SMURFs" << std::endl;
                     loadSmurfsScene(absoluteEntityFilePath);
-                } else if(entityFileExtension == ".smurf")
+                }
+                else if(entityFileExtension == ".smurf")
                 {
                     std::cout << "load SMURF" << std::endl;
                     loadSmurfScene(absoluteEntityFilePath, robotname, pos, rot);
-                } else if(entityFileExtension == ".yml")
+                }
+                else if(entityFileExtension == ".yml")
                 {
                     loadYamlMarsScene(utils::getPathOfFile(absoluteEntityFilePath), entityFileName, robotname, pos, rot);
-                } else
+                }
+                else
                 {
                     const std::string errmsg = "The MarsSceneLoader does not support the file format: " + entityFileExtension;
                     LOG_ERROR("%s", errmsg.c_str());
@@ -255,24 +257,22 @@ namespace mars
             path += "/models/environments/mars";
             // first load smurfs file
             std::string file = path + "/terrain.smurfs";*/
-            ConfigMap scene = ConfigMap::fromYamlFile(filePath);
-            std::string path = utils::getPathOfFile(filePath);
+            auto scene = ConfigMap::fromYamlFile(filePath);
+            auto path = utils::getPathOfFile(filePath);
 
             // load configuration
             loadConfiguration(path, scene);
 
             // load plugins
-            std::string libName = "";
-            lib_manager::LibInfo libInfo;
             if(scene.hasKey("plugins"))
             {
                 for(auto nt: scene["plugins"])
                 {
-                    libName << nt;
-                    libInfo = libManager->getLibraryInfo(libName);
+                    const auto libName = nt.toString();
+                    const auto libInfo = libManager->getLibraryInfo(libName);
                     if(libInfo.name != libName)
                     {
-                        libManager->loadLibrary(libName, NULL, false);
+                        libManager->loadLibrary(libName, nullptr, false);
                     }
                 }
             }
@@ -296,13 +296,13 @@ namespace mars
                 const std::string errmsg = "Can not load the smurf scene  " + filePath + ", since the robot name is not given";
                 LOG_ERROR("%s", errmsg.c_str());
             }
-            std::string prefix = robotname;
+            const auto& prefix = robotname;
 
             // TODO: use envire_base_loader
             // add envire_smurf_loader
             // then a coyote
             {
-                envire::core::FrameId parentFrameId = SIM_CENTER_FRAME_NAME;
+                const auto parentFrameId = envire::core::FrameId{SIM_CENTER_FRAME_NAME};
                 std::cout << "LOAD OVER ENVIRE BASE LOADER" << std::endl;
                 // ########################################## test loading of graph
                 // load example robot
@@ -317,13 +317,13 @@ namespace mars
         void MarsSceneLoader::loadYamlMarsScene(const std::string &path, const std::string &file, const std::string &robotname,
                                                 utils::Vector pos, utils::Quaternion rot)
         {
-            std::string filepath = pathJoin(path, file);
-            ConfigMap model = ConfigMap::fromYamlFile(filepath);
+            const auto filepath = pathJoin(path, file);
+            auto model = ConfigMap::fromYamlFile(filepath);
             for(auto& node: model["nodelist"])
             {
                 // TODO: create envire_types and visual and collision items in graph instead of directly creating
                 //       visual and collision objects
-                ConfigMap config = node;
+                auto config = static_cast<ConfigMap>(node);
                 if(robotname != "")
                 {
                     config["name"] = robotname + "." + config["name"].getString();
@@ -359,10 +359,11 @@ namespace mars
                 nodeData.material.fromConfigMap(&material, "");
                 unsigned long drawID = graphics->addDrawObject(nodeData, showViz);
                 drawIDs.push_back(drawID);
-                ode_collision::Object *collisionObject;
+
                 // TODO: load the node as base type into the graph, add HeightMap type into base type
                 if(nodeData.noPhysical == false)
                 {
+                    ode_collision::Object* collisionObject;
                     // check physics type:
                     if(nodeData.terrain)
                     {
@@ -373,7 +374,7 @@ namespace mars
                         config["size"]["y"] = config["extend"]["y"];
                         config["size"]["z"] = config["extend"]["z"];
 
-                        ode_collision::Heightfield* collision = (ode_collision::Heightfield*)(globalCollisionSpace->createObject(config, NULL));
+                        auto* const collision = dynamic_cast<ode_collision::Heightfield*>(globalCollisionSpace->createObject(config, nullptr));
                         collisionObject = collision;
                         if(!collision)
                         {
@@ -393,7 +394,7 @@ namespace mars
                         ConfigMap tmpMap;
                         nodeData.toConfigMap(&tmpMap);
                         tmpMap["type"] = tmpMap["physicmode"];
-                        ode_collision::Object* collision = ControlCenter::collision->createObject(tmpMap);
+                        auto* const collision = ControlCenter::collision->createObject(tmpMap);
                         collisionObject = collision;
                         if(!collision)
                         {
@@ -404,7 +405,7 @@ namespace mars
                         {
                             nodeData.filename = pathJoin(path, nodeData.filename);
                             ControlCenter::loadCenter->loadMesh->getPhysicsFromMesh(&nodeData);
-                            ((ode_collision::Mesh*)collision)->setMeshData(nodeData.mesh);
+                            dynamic_cast<ode_collision::Mesh*>(collision)->setMeshData(nodeData.mesh);
                             collision->createGeom();
                         }
                     }
@@ -421,7 +422,7 @@ namespace mars
         {
             if(scene.hasKey("environment"))
             {
-                configmaps::ConfigMap envmap = scene["environment"];
+                auto envmap = static_cast<configmaps::ConfigMap>(scene["environment"]);
                 if(cfg)
                 {
                     if (envmap.hasKey("skybox"))
@@ -429,7 +430,7 @@ namespace mars
                         cfg->createParam("Scene","skydome_path", cfg_manager::stringParam);
                         cfg->createParam("Scene","skydome_enabled", cfg_manager::boolParam);
                         // check if path is relative to smurfs scene
-                        std::string skyboxPath = envmap["skybox"]["path"];
+                        auto skyboxPath = envmap["skybox"]["path"].toString();
                         skyboxPath = pathJoin(path, skyboxPath);
                         if(!pathExists(skyboxPath))
                         {
@@ -472,7 +473,7 @@ namespace mars
                 }
                 if(graphics)
                 {
-                    interfaces::GraphicData goptions = graphics->getGraphicOptions();
+                    auto goptions = graphics->getGraphicOptions();
                     if(envmap.hasKey("background"))
                     {
                         Color bgcol;
@@ -488,7 +489,8 @@ namespace mars
                         Color fogcol;
                         fogcol.fromConfigItem(envmap["fog"]["color"]);
                         goptions.fogColor = fogcol;
-                    } else
+                    }
+                    else
                     {
                         goptions.fogEnabled = false;
                     }
@@ -497,7 +499,7 @@ namespace mars
             }
             if(scene.hasKey("physics"))
             {
-                configmaps::ConfigMap physicsmap = scene["physics"];
+                auto physicsmap = static_cast<configmaps::ConfigMap>(scene["physics"]);
                 if(physicsmap.hasKey("gravity"))
                 {
                     utils::Vector gravvec;
@@ -534,7 +536,7 @@ namespace mars
             showViz = _property.iValue & 1;
             if(graphics)
             {
-                for(auto &it: drawIDs)
+                for(const auto& it: drawIDs)
                 {
                     graphics->setDrawObjectShow(it, showViz);
                 }

@@ -39,7 +39,7 @@ namespace mars
 
             const std::string getLibName() const override
             {
-                return std::string("mars_scene_loader");
+                return std::string{"mars_scene_loader"};
             }
 
             bool loadFile(std::string filename, std::string tmpPath,
@@ -54,7 +54,7 @@ namespace mars
 
         private:
             ode_collision::CollisionSpaceLoader *collisionSpaceLoader;
-            std::shared_ptr<interfaces::CollisionInterface> globalCollisionSpace;
+            interfaces::CollisionInterface* globalCollisionSpace;
             interfaces::GraphicsManagerInterface *graphics;
             interfaces::SimulatorInterface *sim;
             cfg_manager::CFGManagerInterface *cfg;
