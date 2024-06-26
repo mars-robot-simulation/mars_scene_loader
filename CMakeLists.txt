@@ -32,6 +32,7 @@ pkg_check_modules(PKGCONFIG REQUIRED
     mars_interfaces
     mars_graphics
     mars_ode_collision
+    mars_ode_physics
     envire_core
     envire_smurf_loader
 )
