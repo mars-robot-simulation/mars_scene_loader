@@ -44,6 +44,7 @@ namespace mars
         using namespace utils;
         using namespace interfaces;
         using namespace configmaps;
+        using namespace envire::smurf_loader;
 
         MarsSceneLoader::MarsSceneLoader(lib_manager::LibManager *theManager) :
             interfaces::LoadSceneInterface{theManager}
@@ -378,7 +379,7 @@ namespace mars
                 configmaps::ConfigMap worldMap;
                 worldMap["name"] = worldFrame;
                 worldMap["prefix"] = config["name"].getString();
-                std::string worldClassName(BASE_TYPES_NAMESPACE + std::string("World"));
+                std::string worldClassName(base_types_namespace + std::string("World"));
                 envire::core::ItemBase::Ptr worldItem = envire::types::TypeCreatorFactory::createItem(worldClassName, worldMap);
                 ControlCenter::envireGraph->addItemToFrame(worldFrame, worldItem);
 
@@ -432,7 +433,7 @@ namespace mars
                 }
 
                 // create and add into the graph envire item with the object corresponding to config type
-                std::string visualClassName(GEOMETRY_NAMESPACE + config["type"].toString());
+                std::string visualClassName(geometry_namespace + config["type"].toString());
                 envire::core::ItemBase::Ptr visualItem = envire::types::TypeCreatorFactory::createItem(visualClassName, config);
                 if (!visualItem) {
                     LOG_ERROR_S << "Can not add visual " << config["name"].toString()
@@ -477,7 +478,7 @@ namespace mars
                         ControlCenter::envireGraph->addTransform(worldFrame, collisionFrame, initPose);
 
                         // create and add into the graph envire item with the object corresponding to config type
-                        std::string collisionClassName(GEOMETRY_NAMESPACE + config["type"].toString());
+                        std::string collisionClassName(geometry_namespace + config["type"].toString());
                         envire::core::ItemBase::Ptr colisionItem = envire::types::TypeCreatorFactory::createItem(collisionClassName, config);
                         if (!colisionItem) {
                             LOG_ERROR_S << "Can not add collision " << config["name"].toString()
