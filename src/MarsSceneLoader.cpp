@@ -354,38 +354,17 @@ namespace mars
                
                 if(nodeData.terrain && !nodeData.terrain->pixelData)
                 {
-                    LOG_ERROR("Load heightmap pixelData...");
+                    LOG_INFO("Load heightmap pixelData...");
                     //nodeData.terrain = new(terrainStruct);
                     // TODO: add proper path handling
                     nodeData.terrain->srcname = path + "/" + nodeData.terrain->srcname;
-                    LOG_ERROR(nodeData.terrain->srcname.c_str());
+                    LOG_INFO(nodeData.terrain->srcname.c_str());
                     ControlCenter::loadCenter->loadHeightmap->readPixelData(nodeData.terrain);
                     if(!nodeData.terrain->pixelData)
                     {
                         LOG_ERROR("NodeManager::addNode: could not load image for terrain");
                     }
                 }
-
-                //Load visuals
-                //Every visual in the yaml needs to be independently attached to the world so that each node
-                //from the nodeList can be positioned independent of other nodes. See e.g. plane.yml in crex/crex_sim
-                //TODO: How can the parent frame be handled?
-                envire::core::FrameId worldFrame = "World::" + config["name"].getString();
-                ControlCenter::envireGraph->addFrame(worldFrame);
-                envire::core::Transform initWorldPose(nodeData.pos, nodeData.rot);
-                ControlCenter::envireGraph->addTransform(parentFrameId, worldFrame, initWorldPose);
-
-                // add world into the world frame
-                configmaps::ConfigMap worldMap;
-                worldMap["name"] = worldFrame;
-                worldMap["prefix"] = config["name"].getString();
-                std::string worldClassName(base_types_namespace + std::string("World"));
-                envire::core::ItemBase::Ptr worldItem = envire::types::TypeCreatorFactory::createItem(worldClassName, worldMap);
-                ControlCenter::envireGraph->addItemToFrame(worldFrame, worldItem);
-
-                // add visual frame
-                envire::core::FrameId visualFrame = config["name"].getString() + "_" + "visual";
-                ControlCenter::envireGraph->addFrame(visualFrame);
 
                 base::Position position;
                 base::Orientation rotation;
@@ -399,95 +378,84 @@ namespace mars
                 rotation.y() = nodeData.rot.y();
                 rotation.z() = nodeData.rot.z();
 
-                envire::core::Transform initPose(position, rotation);
-                ControlCenter::envireGraph->addTransform(worldFrame, visualFrame, initPose);
+                std::string objectType = "";
               
                 if (config["physicmode"].toString() == "plane")
                 {
-                    config["type"] = "Plane";
+                    objectType = "Plane";
                     config["size"]["x"] = config["extend"]["x"];
                     config["size"]["y"] = config["extend"]["y"];
                 }
                 else if (config["physicmode"].toString() == "box")
                 {
-                    config["type"] = "Box";
+                    objectType = "Box";
                     config["size"]["x"] = config["extend"]["x"];
                     config["size"]["y"] = config["extend"]["y"];
                     config["size"]["z"] = config["extend"]["z"];
                 }
                 else if (config["physicmode"].toString() == "cylinder")
                 {
-                    config["type"] = "Cylinder";
+                    objectType = "Cylinder";
                 }
                 else if (config["physicmode"].toString() == "sphere")
                 {
-                    config["type"] = "Sphere";
+                    objectType = "Sphere";
                 }
                 else if (config["physicmode"].toString() == "capsule")
                 {
-                    config["type"] = "Capsule";
+                    objectType = "Capsule";
                 }
                 else if (config["physicmode"].toString() == "mesh")
                 {
-                    config["type"] = "Mesh";
+                    objectType = "Mesh";
+                }
+                else if (config["physicmode"].toString() == "heightfield")
+                {
+                    objectType = "Heightfield";
+                }
+                
+                if (objectType == ""){
+                    LOG_ERROR_S << "Can not add object " << objectType
+                                << ", because the object type " << objectType << " is not known.";
+                    return;              
                 }
 
                 // create and add into the graph envire item with the object corresponding to config type
-                std::string visualClassName(geometry_namespace + config["type"].toString());
+                std::string visualClassName(geometry_namespace + objectType);
                 envire::core::ItemBase::Ptr visualItem = envire::types::TypeCreatorFactory::createItem(visualClassName, config);
                 if (!visualItem) {
-                    LOG_ERROR_S << "Can not add visual " << config["name"].toString()
-                                << ", probably the visual type " << config["type"].toString() << " is not registered.";
+                    LOG_ERROR_S << "Can not add visual " << objectType
+                                << ", probably the visual type " << objectType << " is not registered.";
                     return;
                 }
                 visualItem->setTag("visual");
+
+                envire::core::Transform initPose(position, rotation);
+                envire::core::FrameId visualFrame = config["name"].getString() + "_" + "visual";
+                ControlCenter::envireGraph->addFrame(visualFrame);
+                ControlCenter::envireGraph->addTransform(parentFrameId, visualFrame, initPose);
                 ControlCenter::envireGraph->addItemToFrame(visualFrame, visualItem);
+
+                std::cout << "Added visual!" << std::endl;
 
                 // TODO: load the node as base type into the graph, add HeightMap type into base type
                 if(nodeData.noPhysical == false)
                 {
-                    ode_collision::Object* collisionObject;
-                    // check physics type:
-                    if(nodeData.terrain)
-                    {
-                        config["type"] = "heightfield";
-                        // TODO: this is converstion from old mars config to new
-                        // sould be done in loader later
-                        config["size"]["x"] = config["extend"]["x"];
-                        config["size"]["y"] = config["extend"]["y"];
-                        config["size"]["z"] = config["extend"]["z"];
-
-                        auto* const collision = dynamic_cast<ode_collision::Heightfield*>(globalCollisionSpace->createObject(config, nullptr));
-                        collisionObject = collision;
-                        if(!collision)
-                        {
-                            LOG_ERROR("Error creating collision object!");
-                            return;
-                        }
-                        collision->setTerrainStrcut(nodeData.terrain);
-                        if(!collision->createGeom())
-                        {
-                            LOG_ERROR("Error creating heightfield geom!");
-                            return;
-                        }
+                    // create and add into the graph envire item with the object corresponding to config type
+                    std::string collisionClassName(geometry_namespace + objectType);
+                    envire::core::ItemBase::Ptr colisionItem = envire::types::TypeCreatorFactory::createItem(collisionClassName, config);
+                    if (!colisionItem) {
+                        LOG_ERROR_S << "Can not add collision " << objectType
+                                    << ", probably the collision type " << objectType << " is not registered.";
+                        return;
                     }
-                    else
-                    {
-                        envire::core::FrameId collisionFrame = config["name"].getString() + "_" + "collision";
-                        ControlCenter::envireGraph->addFrame(collisionFrame);
-                        ControlCenter::envireGraph->addTransform(worldFrame, collisionFrame, initPose);
-
-                        // create and add into the graph envire item with the object corresponding to config type
-                        std::string collisionClassName(geometry_namespace + config["type"].toString());
-                        envire::core::ItemBase::Ptr colisionItem = envire::types::TypeCreatorFactory::createItem(collisionClassName, config);
-                        if (!colisionItem) {
-                            LOG_ERROR_S << "Can not add collision " << config["name"].toString()
-                                        << ", probably the collision type " << config["type"].toString() << " is not registered.";
-                            return;
-                        }
-                        colisionItem->setTag("collision");
-                        ControlCenter::envireGraph->addItemToFrame(collisionFrame, colisionItem);
-                    }
+                    colisionItem->setTag("collision");
+                    
+                    envire::core::FrameId collisionFrame = config["name"].getString() + "_" + "collision";
+                    ControlCenter::envireGraph->addFrame(collisionFrame);
+                    ControlCenter::envireGraph->addTransform(parentFrameId, collisionFrame, initPose);
+                    ControlCenter::envireGraph->addItemToFrame(collisionFrame, colisionItem);
+                    std::cout << "Added collision!" << std::endl;
                 }
             }
         }
