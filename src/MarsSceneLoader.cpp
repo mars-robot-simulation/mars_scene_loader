@@ -28,6 +28,11 @@
 
 #include <envire_smurf_loader/Model.hpp>
 
+#include <base-logging/Logging.hpp>
+#include <envire_types/registration/TypeCreatorFactory.hpp>
+
+
+
 typedef envire::core::GraphTraits::vertex_descriptor VertexDesc;
 
 namespace mars
@@ -319,6 +324,9 @@ namespace mars
         {
             const auto filepath = pathJoin(path, file);
             auto model = ConfigMap::fromYamlFile(filepath);
+
+            const auto parentFrameId = envire::core::FrameId{SIM_CENTER_FRAME_NAME};
+
             for(auto& node: model["nodelist"])
             {
                 // TODO: create envire_types and visual and collision items in graph instead of directly creating
@@ -333,16 +341,16 @@ namespace mars
                 nodeData.fromConfigMap(&config, "");
                 nodeData.pos += pos;
                 nodeData.rot *= rot;
-                ConfigMap material;
+
                 for(auto& it: model["materiallist"])
                 {
                     if(config["material_id"] == it["id"])
                     {
-                        material = it;
-                        material["loadPath"] = path;
+                        config["material"] = it;
                         break;
                     }
                 }
+               
                 if(nodeData.terrain && !nodeData.terrain->pixelData)
                 {
                     LOG_ERROR("Load heightmap pixelData...");
@@ -356,9 +364,83 @@ namespace mars
                         LOG_ERROR("NodeManager::addNode: could not load image for terrain");
                     }
                 }
-                nodeData.material.fromConfigMap(&material, "");
-                unsigned long drawID = graphics->addDrawObject(nodeData, showViz);
-                drawIDs.push_back(drawID);
+
+                //Load visuals
+                //Every visual in the yaml needs to be independently attached to the world so that each node
+                //from the nodeList can be positioned independent of other nodes. See e.g. plane.yml in crex/crex_sim
+                //TODO: How can the parent frame be handled?
+                envire::core::FrameId worldFrame = "World::" + config["name"].getString();
+                ControlCenter::envireGraph->addFrame(worldFrame);
+                envire::core::Transform initWorldPose(nodeData.pos, nodeData.rot);
+                ControlCenter::envireGraph->addTransform(parentFrameId, worldFrame, initWorldPose);
+
+                // add world into the world frame
+                configmaps::ConfigMap worldMap;
+                worldMap["name"] = worldFrame;
+                worldMap["prefix"] = config["name"].getString();
+                std::string worldClassName(BASE_TYPES_NAMESPACE + std::string("World"));
+                envire::core::ItemBase::Ptr worldItem = envire::types::TypeCreatorFactory::createItem(worldClassName, worldMap);
+                ControlCenter::envireGraph->addItemToFrame(worldFrame, worldItem);
+
+                // add visual frame
+                envire::core::FrameId visualFrame = config["name"].getString() + "_" + "visual";
+                ControlCenter::envireGraph->addFrame(visualFrame);
+
+                base::Position position;
+                base::Orientation rotation;
+
+                position.x() = nodeData.pos.x();
+                position.y() = nodeData.pos.y();
+                position.z() = nodeData.pos.z();
+
+                rotation.w() = nodeData.rot.w();
+                rotation.x() = nodeData.rot.x();
+                rotation.y() = nodeData.rot.y();
+                rotation.z() = nodeData.rot.z();
+
+                envire::core::Transform initPose(position, rotation);
+                ControlCenter::envireGraph->addTransform(worldFrame, visualFrame, initPose);
+              
+                if (config["physicmode"].toString() == "plane")
+                {
+                    config["type"] = "Plane";
+                    config["size"]["x"] = config["extend"]["x"];
+                    config["size"]["y"] = config["extend"]["y"];
+                }
+                else if (config["physicmode"].toString() == "box")
+                {
+                    config["type"] = "Box";
+                    config["size"]["x"] = config["extend"]["x"];
+                    config["size"]["y"] = config["extend"]["y"];
+                    config["size"]["z"] = config["extend"]["z"];
+                }
+                else if (config["physicmode"].toString() == "cylinder")
+                {
+                    config["type"] = "Cylinder";
+                }
+                else if (config["physicmode"].toString() == "sphere")
+                {
+                    config["type"] = "Sphere";
+                }
+                else if (config["physicmode"].toString() == "capsule")
+                {
+                    config["type"] = "Capsule";
+                }
+                else if (config["physicmode"].toString() == "mesh")
+                {
+                    config["type"] = "Mesh";
+                }
+
+                // create and add into the graph envire item with the object corresponding to config type
+                std::string visualClassName(GEOMETRY_NAMESPACE + config["type"].toString());
+                envire::core::ItemBase::Ptr visualItem = envire::types::TypeCreatorFactory::createItem(visualClassName, config);
+                if (!visualItem) {
+                    LOG_ERROR_S << "Can not add visual " << config["name"].toString()
+                                << ", probably the visual type " << config["type"].toString() << " is not registered.";
+                    return;
+                }
+                visualItem->setTag("visual");
+                ControlCenter::envireGraph->addItemToFrame(visualFrame, visualItem);
 
                 // TODO: load the node as base type into the graph, add HeightMap type into base type
                 if(nodeData.noPhysical == false)
@@ -390,30 +472,21 @@ namespace mars
                     }
                     else
                     {
-                        // TODO: create collision item in graph instead of collision object directly
-                        ConfigMap tmpMap;
-                        nodeData.toConfigMap(&tmpMap);
-                        tmpMap["type"] = tmpMap["physicmode"];
-                        auto* const collision = ControlCenter::collision->createObject(tmpMap);
-                        collisionObject = collision;
-                        if(!collision)
-                        {
-                            LOG_ERROR("Error creating mars_yaml collision object!");
+                        envire::core::FrameId collisionFrame = config["name"].getString() + "_" + "collision";
+                        ControlCenter::envireGraph->addFrame(collisionFrame);
+                        ControlCenter::envireGraph->addTransform(worldFrame, collisionFrame, initPose);
+
+                        // create and add into the graph envire item with the object corresponding to config type
+                        std::string collisionClassName(GEOMETRY_NAMESPACE + config["type"].toString());
+                        envire::core::ItemBase::Ptr colisionItem = envire::types::TypeCreatorFactory::createItem(collisionClassName, config);
+                        if (!colisionItem) {
+                            LOG_ERROR_S << "Can not add collision " << config["name"].toString()
+                                        << ", probably the collision type " << config["type"].toString() << " is not registered.";
                             return;
                         }
-                        if(tmpMap["type"] == "mesh")
-                        {
-                            nodeData.filename = pathJoin(path, nodeData.filename);
-                            ControlCenter::loadCenter->loadMesh->getPhysicsFromMesh(&nodeData);
-                            dynamic_cast<ode_collision::Mesh*>(collision)->setMeshData(nodeData.mesh);
-                            collision->createGeom();
-                        }
+                        colisionItem->setTag("collision");
+                        ControlCenter::envireGraph->addItemToFrame(collisionFrame, colisionItem);
                     }
-                    collisionObject->setPosition(nodeData.pos);
-                    collisionObject->setRotation(nodeData.rot);
-                    // the position update is applied in updateTransform which is not
-                    // called automatically for static objects
-                    collisionObject->updateTransform();
                 }
             }
         }
