@@ -357,8 +357,12 @@ namespace mars
                     }
                 }
                 nodeData.material.fromConfigMap(&material, "");
-                unsigned long drawID = graphics->addDrawObject(nodeData, showViz);
-                drawIDs.push_back(drawID);
+
+                if(graphics)
+                {
+                    unsigned long drawID = graphics->addDrawObject(nodeData, showViz);
+                    drawIDs.push_back(drawID);
+                }
 
                 // TODO: load the node as base type into the graph, add HeightMap type into base type
                 if(nodeData.noPhysical == false)
