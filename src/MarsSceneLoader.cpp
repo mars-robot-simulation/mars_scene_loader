@@ -341,21 +341,15 @@ namespace mars
             std::string className(base_types_namespace + std::string("World"));
             envire::core::ItemBase::Ptr item = envire::types::TypeCreatorFactory::createItem(className, worldMap);
             ControlCenter::envireGraph->addItemToFrame(worldFrame, item);
+
             for(auto& node: model["nodelist"])
             {
-                // TODO: create envire_types and visual and collision items in graph instead of directly creating
-                //       visual and collision objects
                 auto config = static_cast<ConfigMap>(node);
                 if(robotname != "")
                 {
                     config["name"] = robotname + "." + config["name"].getString();
                 }
-                interfaces::NodeData nodeData;
                 config["filePrefix"] = path;
-                nodeData.fromConfigMap(&config, "");
-                nodeData.pos += pos;
-                nodeData.rot *= rot;
-
                 for(auto& it: model["materiallist"])
                 {
                     if(config["material_id"] == it["id"])
@@ -364,33 +358,13 @@ namespace mars
                         break;
                     }
                 }
-               
-                if(nodeData.terrain && !nodeData.terrain->pixelData)
-                {
-                    LOG_INFO("Load heightmap pixelData...");
-                    //nodeData.terrain = new(terrainStruct);
-                    // TODO: add proper path handling
-                    nodeData.terrain->srcname = path + "/" + nodeData.terrain->srcname;
-                    LOG_INFO(nodeData.terrain->srcname.c_str());
-                    ControlCenter::loadCenter->loadHeightmap->readPixelData(nodeData.terrain);
-                    if(!nodeData.terrain->pixelData)
-                    {
-                        LOG_ERROR("NodeManager::addNode: could not load image for terrain");
-                    }
-                }
 
-                base::Position position;
-                base::Orientation rotation;
-
-                position.x() = nodeData.pos.x();
-                position.y() = nodeData.pos.y();
-                position.z() = nodeData.pos.z();
-
-                rotation.w() = nodeData.rot.w();
-                rotation.x() = nodeData.rot.x();
-                rotation.y() = nodeData.rot.y();
-                rotation.z() = nodeData.rot.z();
-
+                interfaces::NodeData nodeData;
+                nodeData.fromConfigMap(&config, "");
+                nodeData.pos += pos;
+                nodeData.rot *= rot;
+                envire::core::Transform framePose(nodeData.pos, nodeData.rot);
+          
                 std::string objectType = "";
               
                 if (config["physicmode"].toString() == "plane")
