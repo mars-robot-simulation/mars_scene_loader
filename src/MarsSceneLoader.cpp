@@ -328,6 +328,19 @@ namespace mars
 
             const auto parentFrameId = envire::core::FrameId{SIM_CENTER_FRAME_NAME};
 
+            std::string prefix = file;
+
+            envire::core::FrameId worldFrame = "World::" + prefix;
+            ControlCenter::envireGraph->addFrame(worldFrame);
+            envire::core::Transform worldPose(pos, rot);
+            ControlCenter::envireGraph->addTransform(parentFrameId, worldFrame, worldPose);
+
+            configmaps::ConfigMap worldMap;
+            worldMap["name"] = worldFrame;
+            worldMap["prefix"] = prefix;
+            std::string className(base_types_namespace + std::string("World"));
+            envire::core::ItemBase::Ptr item = envire::types::TypeCreatorFactory::createItem(className, worldMap);
+            ControlCenter::envireGraph->addItemToFrame(worldFrame, item);
             for(auto& node: model["nodelist"])
             {
                 // TODO: create envire_types and visual and collision items in graph instead of directly creating
@@ -430,10 +443,9 @@ namespace mars
                 }
                 visualItem->setTag("visual");
 
-                envire::core::Transform initPose(position, rotation);
                 envire::core::FrameId visualFrame = config["name"].getString() + "_" + "visual";
                 ControlCenter::envireGraph->addFrame(visualFrame);
-                ControlCenter::envireGraph->addTransform(parentFrameId, visualFrame, initPose);
+                ControlCenter::envireGraph->addTransform(worldFrame, visualFrame, framePose);
                 ControlCenter::envireGraph->addItemToFrame(visualFrame, visualItem);
 
                 std::cout << "Added visual!" << std::endl;
@@ -453,7 +465,7 @@ namespace mars
                     
                     envire::core::FrameId collisionFrame = config["name"].getString() + "_" + "collision";
                     ControlCenter::envireGraph->addFrame(collisionFrame);
-                    ControlCenter::envireGraph->addTransform(parentFrameId, collisionFrame, initPose);
+                    ControlCenter::envireGraph->addTransform(worldFrame, collisionFrame, framePose);
                     ControlCenter::envireGraph->addItemToFrame(collisionFrame, colisionItem);
                     std::cout << "Added collision!" << std::endl;
                 }
