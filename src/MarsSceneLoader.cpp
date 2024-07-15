@@ -345,15 +345,18 @@ namespace mars
             for(auto& node: model["nodelist"])
             {
                 auto config = static_cast<ConfigMap>(node);
+                config["filePrefix"] = path;
+
                 if(robotname != "")
                 {
                     config["name"] = robotname + "." + config["name"].getString();
                 }
-                config["filePrefix"] = path;
+
                 for(auto& it: model["materiallist"])
                 {
                     if(config["material_id"] == it["id"])
                     {
+                        it["loadPath"] = config["filePrefix"];
                         config["material"] = it;
                         break;
                     }
