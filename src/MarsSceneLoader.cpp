@@ -356,7 +356,7 @@ namespace mars
                 {
                     if(config["material_id"] == it["id"])
                     {
-                        it["loadPath"] = config["filePrefix"];
+                        it["loadPath"] = path;
                         config["material"] = it;
                         break;
                     }
