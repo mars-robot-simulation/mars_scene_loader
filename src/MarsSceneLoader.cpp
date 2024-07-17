@@ -75,21 +75,6 @@ namespace mars
             ControlCenter::loadCenter->loadScene[".smurfs"] = this; // smurf scene
             std::cout << "MarsSceneLoader added as SMURF loader to LoadCenter" << std::endl;
 
-            // search for root collision space that we expect as item under the root frame
-            globalCollisionSpace = nullptr;
-            try
-            {
-                auto it = ControlCenter::envireGraph->getItem<envire::core::Item<CollisionInterfaceItem>>(SIM_CENTER_FRAME_NAME);
-                globalCollisionSpace = it->getData().collisionInterface.get();
-            }
-            catch (...)
-            {
-                globalCollisionSpace = nullptr;
-            }
-            if(!globalCollisionSpace)
-            {
-                LOG_ERROR("MarsSceneLoader: cannot find collisionInterfaceItem at root frame in envire graph!");
-            }
             showViz = true;
             if(cfg)
             {

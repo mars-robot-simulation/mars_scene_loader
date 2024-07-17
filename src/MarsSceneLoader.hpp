@@ -54,7 +54,6 @@ namespace mars
 
         private:
             ode_collision::CollisionSpaceLoader *collisionSpaceLoader;
-            interfaces::CollisionInterface* globalCollisionSpace;
             interfaces::GraphicsManagerInterface *graphics;
             interfaces::SimulatorInterface *sim;
             cfg_manager::CFGManagerInterface *cfg;
