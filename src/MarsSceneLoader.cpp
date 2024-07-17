@@ -289,7 +289,8 @@ namespace mars
                 // currently we handle only yml
                 if(getFilenameSuffix(filename["file"]) == ".yml")
                 {
-                    loadYamlMarsScene(path, filename["file"], "", Vector(0.0, 0.0, 0.0), Quaternion(1.0, 0.0, 0.0, 0.0));
+                    const auto frameName = filename.hasKey("name") ? filename["name"].toString() : filename["file"].toString();
+                    loadYamlMarsScene(path, filename["file"], frameName, Vector(0.0, 0.0, 0.0), Quaternion(1.0, 0.0, 0.0, 0.0));
                 }
             }
         }
@@ -330,7 +331,7 @@ namespace mars
 
             std::string prefix = file;
 
-            envire::core::FrameId worldFrame = "World::" + prefix;
+            envire::core::FrameId worldFrame = "World::" + robotname;
             ControlCenter::envireGraph->addFrame(worldFrame);
             envire::core::Transform worldPose(pos, rot);
             ControlCenter::envireGraph->addTransform(parentFrameId, worldFrame, worldPose);
