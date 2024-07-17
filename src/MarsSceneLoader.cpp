@@ -28,6 +28,11 @@
 
 #include <envire_smurf_loader/Model.hpp>
 
+#include <base-logging/Logging.hpp>
+#include <envire_types/registration/TypeCreatorFactory.hpp>
+
+
+
 typedef envire::core::GraphTraits::vertex_descriptor VertexDesc;
 
 namespace mars
@@ -39,6 +44,7 @@ namespace mars
         using namespace utils;
         using namespace interfaces;
         using namespace configmaps;
+        using namespace envire::smurf_loader;
 
         MarsSceneLoader::MarsSceneLoader(lib_manager::LibManager *theManager) :
             interfaces::LoadSceneInterface{theManager}
@@ -283,7 +289,8 @@ namespace mars
                 // currently we handle only yml
                 if(getFilenameSuffix(filename["file"]) == ".yml")
                 {
-                    loadYamlMarsScene(path, filename["file"], "", Vector(0.0, 0.0, 0.0), Quaternion(1.0, 0.0, 0.0, 0.0));
+                    const auto frameName = filename.hasKey("name") ? filename["name"].toString() : filename["file"].toString();
+                    loadYamlMarsScene(path, filename["file"], frameName, Vector(0.0, 0.0, 0.0), Quaternion(1.0, 0.0, 0.0, 0.0));
                 }
             }
         }
@@ -319,105 +326,126 @@ namespace mars
         {
             const auto filepath = pathJoin(path, file);
             auto model = ConfigMap::fromYamlFile(filepath);
+
+            const auto parentFrameId = envire::core::FrameId{SIM_CENTER_FRAME_NAME};
+
+            std::string prefix = file;
+
+            envire::core::FrameId worldFrame = "World::" + robotname;
+            ControlCenter::envireGraph->addFrame(worldFrame);
+            envire::core::Transform worldPose(pos, rot);
+            ControlCenter::envireGraph->addTransform(parentFrameId, worldFrame, worldPose);
+
+            configmaps::ConfigMap worldMap;
+            worldMap["name"] = worldFrame;
+            worldMap["prefix"] = prefix;
+            std::string className(base_types_namespace + std::string("World"));
+            envire::core::ItemBase::Ptr item = envire::types::TypeCreatorFactory::createItem(className, worldMap);
+            ControlCenter::envireGraph->addItemToFrame(worldFrame, item);
+
             for(auto& node: model["nodelist"])
             {
-                // TODO: create envire_types and visual and collision items in graph instead of directly creating
-                //       visual and collision objects
                 auto config = static_cast<ConfigMap>(node);
+                config["filePrefix"] = path;
+
                 if(robotname != "")
                 {
                     config["name"] = robotname + "." + config["name"].getString();
                 }
-                interfaces::NodeData nodeData;
-                config["filePrefix"] = path;
-                nodeData.fromConfigMap(&config, "");
-                nodeData.pos += pos;
-                nodeData.rot *= rot;
-                ConfigMap material;
+
                 for(auto& it: model["materiallist"])
                 {
                     if(config["material_id"] == it["id"])
                     {
-                        material = it;
-                        material["loadPath"] = path;
+                        it["loadPath"] = path;
+                        config["material"] = it;
                         break;
                     }
                 }
-                if(nodeData.terrain && !nodeData.terrain->pixelData)
-                {
-                    LOG_ERROR("Load heightmap pixelData...");
-                    //nodeData.terrain = new(terrainStruct);
-                    // TODO: add proper path handling
-                    nodeData.terrain->srcname = path + "/" + nodeData.terrain->srcname;
-                    LOG_ERROR(nodeData.terrain->srcname.c_str());
-                    ControlCenter::loadCenter->loadHeightmap->readPixelData(nodeData.terrain);
-                    if(!nodeData.terrain->pixelData)
-                    {
-                        LOG_ERROR("NodeManager::addNode: could not load image for terrain");
-                    }
-                }
-                nodeData.material.fromConfigMap(&material, "");
 
-                if(graphics)
+                interfaces::NodeData nodeData;
+                nodeData.fromConfigMap(&config, "");
+                nodeData.pos += pos;
+                nodeData.rot *= rot;
+                envire::core::Transform framePose(nodeData.pos, nodeData.rot);
+          
+                std::string objectType = "";
+              
+                if (config["physicmode"].toString() == "plane")
                 {
-                    unsigned long drawID = graphics->addDrawObject(nodeData, showViz);
-                    drawIDs.push_back(drawID);
+                    objectType = "Plane";
+                    config["size"]["x"] = config["extend"]["x"];
+                    config["size"]["y"] = config["extend"]["y"];
                 }
+                else if (config["physicmode"].toString() == "box")
+                {
+                    objectType = "Box";
+                    config["size"]["x"] = config["extend"]["x"];
+                    config["size"]["y"] = config["extend"]["y"];
+                    config["size"]["z"] = config["extend"]["z"];
+                }
+                else if (config["physicmode"].toString() == "cylinder")
+                {
+                    objectType = "Cylinder";
+                }
+                else if (config["physicmode"].toString() == "sphere")
+                {
+                    objectType = "Sphere";
+                }
+                else if (config["physicmode"].toString() == "capsule")
+                {
+                    objectType = "Capsule";
+                }
+                else if (config["physicmode"].toString() == "mesh")
+                {
+                    objectType = "Mesh";
+                }
+                else if (config["physicmode"].toString() == "heightfield")
+                {
+                    objectType = "Heightfield";
+                }
+                
+                if (objectType == ""){
+                    LOG_ERROR_S << "Can not add object " << objectType
+                                << ", because the object type " << objectType << " is not known.";
+                    return;              
+                }
+
+                // create and add into the graph envire item with the object corresponding to config type
+                std::string visualClassName(geometry_namespace + objectType);
+                envire::core::ItemBase::Ptr visualItem = envire::types::TypeCreatorFactory::createItem(visualClassName, config);
+                if (!visualItem) {
+                    LOG_ERROR_S << "Can not add visual " << objectType
+                                << ", probably the visual type " << objectType << " is not registered.";
+                    return;
+                }
+                visualItem->setTag("visual");
+
+                envire::core::FrameId visualFrame = config["name"].getString() + "_" + "visual";
+                ControlCenter::envireGraph->addFrame(visualFrame);
+                ControlCenter::envireGraph->addTransform(worldFrame, visualFrame, framePose);
+                ControlCenter::envireGraph->addItemToFrame(visualFrame, visualItem);
+
+                std::cout << "Added visual!" << std::endl;
 
                 // TODO: load the node as base type into the graph, add HeightMap type into base type
                 if(nodeData.noPhysical == false)
                 {
-                    ode_collision::Object* collisionObject;
-                    // check physics type:
-                    if(nodeData.terrain)
-                    {
-                        config["type"] = "heightfield";
-                        // TODO: this is converstion from old mars config to new
-                        // sould be done in loader later
-                        config["size"]["x"] = config["extend"]["x"];
-                        config["size"]["y"] = config["extend"]["y"];
-                        config["size"]["z"] = config["extend"]["z"];
-
-                        auto* const collision = dynamic_cast<ode_collision::Heightfield*>(globalCollisionSpace->createObject(config, nullptr));
-                        collisionObject = collision;
-                        if(!collision)
-                        {
-                            LOG_ERROR("Error creating collision object!");
-                            return;
-                        }
-                        collision->setTerrainStrcut(nodeData.terrain);
-                        if(!collision->createGeom())
-                        {
-                            LOG_ERROR("Error creating heightfield geom!");
-                            return;
-                        }
+                    // create and add into the graph envire item with the object corresponding to config type
+                    std::string collisionClassName(geometry_namespace + objectType);
+                    envire::core::ItemBase::Ptr colisionItem = envire::types::TypeCreatorFactory::createItem(collisionClassName, config);
+                    if (!colisionItem) {
+                        LOG_ERROR_S << "Can not add collision " << objectType
+                                    << ", probably the collision type " << objectType << " is not registered.";
+                        return;
                     }
-                    else
-                    {
-                        // TODO: create collision item in graph instead of collision object directly
-                        ConfigMap tmpMap;
-                        nodeData.toConfigMap(&tmpMap);
-                        tmpMap["type"] = tmpMap["physicmode"];
-                        auto* const collision = ControlCenter::collision->createObject(tmpMap);
-                        collisionObject = collision;
-                        if(!collision)
-                        {
-                            LOG_ERROR("Error creating mars_yaml collision object!");
-                            return;
-                        }
-                        if(tmpMap["type"] == "mesh")
-                        {
-                            nodeData.filename = pathJoin(path, nodeData.filename);
-                            ControlCenter::loadCenter->loadMesh->getPhysicsFromMesh(&nodeData);
-                            dynamic_cast<ode_collision::Mesh*>(collision)->setMeshData(nodeData.mesh);
-                            collision->createGeom();
-                        }
-                    }
-                    collisionObject->setPosition(nodeData.pos);
-                    collisionObject->setRotation(nodeData.rot);
-                    // the position update is applied in updateTransform which is not
-                    // called automatically for static objects
-                    collisionObject->updateTransform();
+                    colisionItem->setTag("collision");
+                    
+                    envire::core::FrameId collisionFrame = config["name"].getString() + "_" + "collision";
+                    ControlCenter::envireGraph->addFrame(collisionFrame);
+                    ControlCenter::envireGraph->addTransform(worldFrame, collisionFrame, framePose);
+                    ControlCenter::envireGraph->addItemToFrame(collisionFrame, colisionItem);
+                    std::cout << "Added collision!" << std::endl;
                 }
             }
         }
