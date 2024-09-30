@@ -350,8 +350,6 @@ namespace mars
 
                 interfaces::NodeData nodeData;
                 nodeData.fromConfigMap(&config, "");
-                nodeData.pos += pos;
-                nodeData.rot *= rot;
                 envire::core::Transform framePose(nodeData.pos, nodeData.rot);
           
                 std::string objectType = "";
