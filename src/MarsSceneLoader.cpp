@@ -283,11 +283,11 @@ namespace mars
         void MarsSceneLoader::loadSmurfScene(const std::string &filePath, std::string robotname,
                                             utils::Vector pos, utils::Quaternion rot)
         {
-            if(robotname.empty())
-            {
-                const std::string errmsg = "Can not load the smurf scene  " + filePath + ", since the robot name is not given";
-                LOG_ERROR("%s", errmsg.c_str());
-            }
+            // if(robotname.empty())
+            // {
+            //     const std::string errmsg = "Can not load the smurf scene  " + filePath + ", since the robot name is not given";
+            //     LOG_ERROR("%s", errmsg.c_str());
+            // }
             const auto& prefix = robotname;
 
             // TODO: use envire_base_loader
