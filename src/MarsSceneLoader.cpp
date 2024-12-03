@@ -147,10 +147,14 @@ namespace mars
                 }
                 std::cout << "--- Load: " << std::endl;
                 std::cout << "absoluteEntityFilePath: " << absoluteEntityFilePath << std::endl;
-                std::string robotname;
+                std::string robotname, anchor;
                 if(it->hasKey("name"))
                 {
                     robotname = (*it)["name"].toString();
+                }
+                if(it->hasKey("anchor"))
+                {
+                    anchor = (*it)["anchor"].toString();
                 }
 
                 auto pos = utils::Vector{utils::Vector::Zero()};
@@ -206,10 +210,11 @@ namespace mars
                 else if(entityFileExtension == ".smurf")
                 {
                     std::cout << "load SMURF" << std::endl;
-                    loadSmurfScene(absoluteEntityFilePath, robotname, pos, rot);
+                    loadSmurfScene(absoluteEntityFilePath, robotname, pos, rot, anchor);
                 }
                 else if(entityFileExtension == ".yml")
                 {
+                    // todo: add achnor handling to mars scene format
                     loadYamlMarsScene(utils::getPathOfFile(absoluteEntityFilePath), entityFileName, robotname, pos, rot);
                 }
                 else
@@ -281,7 +286,7 @@ namespace mars
         }
 
         void MarsSceneLoader::loadSmurfScene(const std::string &filePath, std::string robotname,
-                                            utils::Vector pos, utils::Quaternion rot)
+                                             utils::Vector pos, utils::Quaternion rot, std::string anchor)
         {
             // if(robotname.empty())
             // {
@@ -300,6 +305,44 @@ namespace mars
                 // load example robot
                 envire::smurf_loader::Model model;
                 model.loadFromSmurf(ControlCenter::envireGraph, parentFrameId, filePath, pos, rot, prefix);
+
+                if(!anchor.empty())
+                {
+                    std::string parentFrame = model.getWorldFrame();
+                    // try to add fixed joint to anchor model in world
+                    configmaps::ConfigMap jointMap;
+                    jointMap["name"] = prefix + "::anchor";
+
+                    if(anchor != "world")
+                    {
+                        parentFrame = anchor;
+                    }
+                    envire::core::FrameId sourceFrame(parentFrame);
+                    envire::core::FrameId targetFrame(model.getRootFrame());
+                    envire::core::FrameId jointFrame;
+
+                    // the fixed joint will be added to the target frame
+                    jointFrame = targetFrame;
+                    jointMap["type"] = std::string("Fixed");
+
+                    if(!ControlCenter::envireGraph->containsFrame(jointFrame))
+                    {
+                        LOG_ERROR_S << "Can not add Joint " << jointMap["name"].toString()
+                                    <<", since no frame " << jointFrame << " is found in the graph.";
+                        return;
+                    }
+
+                    // create and add into the graph envire item with the object corresponding to config type
+                    std::string className(joint_namespace + jointMap["type"].toString());
+                    envire::core::ItemBase::Ptr item = envire::types::TypeCreatorFactory::createItem(className, jointMap);
+                    if (!item)
+                    {
+                        LOG_ERROR_S << "Can not add joint " << jointMap["name"].toString()
+                                    << ", probably the joint type " << jointMap["type"].toString() << " is not registered.";
+                        return;
+                    }
+                    ControlCenter::envireGraph->addItemToFrame(jointFrame, item);
+                }
             }
 
             //std::string out_dot_file = "test_envire_base_loader.dot";
@@ -351,9 +394,9 @@ namespace mars
                 interfaces::NodeData nodeData;
                 nodeData.fromConfigMap(&config, "");
                 envire::core::Transform framePose(nodeData.pos, nodeData.rot);
-          
+
                 std::string objectType = "";
-              
+
                 if (config["physicmode"].toString() == "plane")
                 {
                     objectType = "Plane";
@@ -387,11 +430,11 @@ namespace mars
                 {
                     objectType = "Heightfield";
                 }
-                
+
                 if (objectType == ""){
                     LOG_ERROR_S << "Can not add object " << objectType
                                 << ", because the object type " << objectType << " is not known.";
-                    return;              
+                    return;
                 }
 
                 // create and add into the graph envire item with the object corresponding to config type
@@ -423,7 +466,7 @@ namespace mars
                         return;
                     }
                     colisionItem->setTag("collision");
-                    
+
                     envire::core::FrameId collisionFrame = config["name"].getString() + "_" + "collision";
                     ControlCenter::envireGraph->addFrame(collisionFrame);
                     ControlCenter::envireGraph->addTransform(worldFrame, collisionFrame, framePose);

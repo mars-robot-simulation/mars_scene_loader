@@ -64,7 +64,7 @@ namespace mars
             void loadConfiguration(const std::string &path, configmaps::ConfigMap &scene);
 
             void loadSmurfsScene(const std::string &filePath);
-            void loadSmurfScene(const std::string &filePath, std::string robotname, utils::Vector pos, utils::Quaternion rot);
+            void loadSmurfScene(const std::string &filePath, std::string robotname, utils::Vector pos, utils::Quaternion rot, std::string anchor);
         };
 
     } // end of namespace mars_scene_loader
