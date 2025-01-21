@@ -1,9 +1,11 @@
 #pragma once
+
+#include <envire_core/items/Item.hpp>
+
 #include <mars_utils/Vector.h>
 
 
 #include <cfg_manager/CFGManagerInterface.h>
-#include <envire_core/items/Item.hpp>
 #include <envire_core/graph/EnvireGraph.hpp>
 #include <envire_core/graph/TreeView.hpp>
 #include <envire_core/events/GraphEventDispatcher.hpp>
@@ -64,7 +66,7 @@ namespace mars
             void loadConfiguration(const std::string &path, configmaps::ConfigMap &scene);
 
             void loadSmurfsScene(const std::string &filePath);
-            void loadSmurfScene(const std::string &filePath, std::string robotname, utils::Vector pos, utils::Quaternion rot, std::string anchor);
+            void loadSmurfScene(const std::string &filePath, std::string robotname, utils::Vector pos, utils::Quaternion rot, std::string anchor, std::string pose);
         };
 
     } // end of namespace mars_scene_loader

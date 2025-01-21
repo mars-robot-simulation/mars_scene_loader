@@ -35,6 +35,7 @@ pkg_check_modules(PKGCONFIG REQUIRED
     mars_ode_physics
     envire_core
     envire_smurf_loader
+    mars_core
 )
 
 include_directories(${PKGCONFIG_INCLUDE_DIRS})

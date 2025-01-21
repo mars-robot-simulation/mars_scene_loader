@@ -11,6 +11,7 @@
     <depend package="simulation/mars2/mars_graphics" />
     <depend package="simulation/mars2/mars_ode_collision" />
     <depend package="simulation/mars2/mars_ode_physics" />
+    <depend package="simulation/mars2/mars_core" />
     <depend package="envire/envire_core" />
     <depend package="envire/envire_smurf_loader" />
     <tags>needs_opt</tags>

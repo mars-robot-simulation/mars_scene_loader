@@ -8,6 +8,11 @@
  *   - indent with four tabs
  */
 
+#include <envire_core/graph/GraphDrawing.hpp>
+#include <envire_core/graph/GraphDrawing.hpp>
+#include <envire_smurf_loader/Model.hpp>
+#include <envire_types/registration/TypeCreatorFactory.hpp>
+
 #include "MarsSceneLoader.hpp"
 
 #include <mars_utils/mathUtils.h>
@@ -19,17 +24,13 @@
 #include <mars_ode_collision/objects/Mesh.hpp>
 #include <mars_interfaces/terrainStruct.h>
 
-#include <mars_interfaces/Logging.hpp>
 #include <mars_interfaces/MARSDefs.h>
+#include <mars_interfaces/sim/MotorManagerInterface.h>
+#include <mars_core/Simulator.hpp>
 
-#include <envire_core/graph/GraphDrawing.hpp>
 
-#include <envire_core/graph/GraphDrawing.hpp>
-
-#include <envire_smurf_loader/Model.hpp>
-
-#include <base-logging/Logging.hpp>
-#include <envire_types/registration/TypeCreatorFactory.hpp>
+//#include <base-logging/Logging.hpp>
+#include <mars_interfaces/Logging.hpp>
 
 
 
@@ -147,7 +148,7 @@ namespace mars
                 }
                 std::cout << "--- Load: " << std::endl;
                 std::cout << "absoluteEntityFilePath: " << absoluteEntityFilePath << std::endl;
-                std::string robotname, anchor;
+                std::string robotname, anchor, pose;
                 if(it->hasKey("name"))
                 {
                     robotname = (*it)["name"].toString();
@@ -155,6 +156,10 @@ namespace mars
                 if(it->hasKey("anchor"))
                 {
                     anchor = (*it)["anchor"].toString();
+                }
+                if(it->hasKey("pose"))
+                {
+                    pose = (*it)["pose"].toString();
                 }
 
                 auto pos = utils::Vector{utils::Vector::Zero()};
@@ -201,6 +206,8 @@ namespace mars
                 std::cout << "robotname: " << robotname << std::endl;
                 std::cout << "pos: " << pos << std::endl;
                 std::cout << "rot: " << rot.w() << " " << rot.vec() << std::endl;
+                std::cout << "pose: " << pose << std::endl;
+                std::cout << "anchor: " << anchor << std::endl;
 
                 if(entityFileExtension == ".smurfs")
                 {
@@ -210,7 +217,7 @@ namespace mars
                 else if(entityFileExtension == ".smurf")
                 {
                     std::cout << "load SMURF" << std::endl;
-                    loadSmurfScene(absoluteEntityFilePath, robotname, pos, rot, anchor);
+                    loadSmurfScene(absoluteEntityFilePath, robotname, pos, rot, anchor, pose);
                 }
                 else if(entityFileExtension == ".yml")
                 {
@@ -286,7 +293,7 @@ namespace mars
         }
 
         void MarsSceneLoader::loadSmurfScene(const std::string &filePath, std::string robotname,
-                                             utils::Vector pos, utils::Quaternion rot, std::string anchor)
+                                             utils::Vector pos, utils::Quaternion rot, std::string anchor, std::string pose)
         {
             // if(robotname.empty())
             // {
@@ -305,6 +312,46 @@ namespace mars
                 // load example robot
                 envire::smurf_loader::Model model;
                 model.loadFromSmurf(ControlCenter::envireGraph, parentFrameId, filePath, pos, rot, prefix);
+
+                // todo: to this point the absolute poses are not calculated, which should be done on an addedTransform handler in the AbsolutePoseExtender
+                const VertexDesc originDesc = ControlCenter::envireGraph->vertex(SIM_CENTER_FRAME_NAME);
+
+                core::Simulator::updateChildPositions(originDesc, base::TransformWithCovariance::Identity(),
+                                                      ControlCenter::envireGraph, ControlCenter::graphTreeView);
+
+                configmaps::ConfigMap smurfMap = model.getSmurfMap();
+                if(pose != "")
+                {
+                    if(smurfMap.hasKey("poses"))
+                    {
+                        bool found = false;
+                        for(auto &it: smurfMap["poses"])
+                        {
+                            if(it["name"] == pose)
+                            {
+                                found = true;
+                                std::string jointName, motorName;
+                                for(auto &joint: (ConfigMap)(it["joints"]))
+                                {
+                                    // apply joint pose
+                                    motorName = robotname + joint.first;
+                                    // todo: replace MotorManager usage by graph operatoins?
+                                    MotorId id = ControlCenter::motors->getID(motorName);
+                                    ControlCenter::motors->setMotorValue(id, (double)joint.second);
+                                }
+                                break;
+                            }
+                        }
+                        if(!found)
+                        {
+                            LOG_ERROR("MarsSceneLoader: pose \"%s\" defined in smurfs scene but not found in poses of robot %s.", pose.c_str(), robotname.c_str());
+                        }
+                    } else
+                    {
+                        LOG_ERROR("MarsSceneLoader: \"pose\" (%s) is given in smurfs file for \"%s\" but no poses are defined in smurfMap!", pose.c_str(), robotname.c_str());
+                    }
+                }
+                //       apply joint positions
 
                 if(!anchor.empty())
                 {
