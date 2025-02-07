@@ -137,15 +137,8 @@ namespace mars
                 auto entityFileName = entityFile;
                 utils::removeFilenamePrefix(&entityFileName);
                 // handle absolute paths
-                std::string absoluteEntityFilePath;
-                if(entityFile.substr(0,1) == "/")
-                {
-                    absoluteEntityFilePath = utils::getPathOfFile(entityFile) + entityFileName;
-                }
-                else
-                {
-                    absoluteEntityFilePath = path + utils::getPathOfFile(entityFile) + entityFileName;
-                }
+                std::string absoluteEntityFilePath = utils::pathJoin(path, utils::getPathOfFile(entityFile));
+                absoluteEntityFilePath = utils::pathJoin(absoluteEntityFilePath, entityFileName);
                 std::cout << "--- Load: " << std::endl;
                 std::cout << "absoluteEntityFilePath: " << absoluteEntityFilePath << std::endl;
                 std::string robotname, anchor, pose;
