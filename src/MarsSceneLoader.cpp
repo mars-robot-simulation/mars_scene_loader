@@ -283,6 +283,16 @@ namespace mars
                     loadYamlMarsScene(path, filename["file"], frameName, Vector(0.0, 0.0, 0.0), Quaternion(1.0, 0.0, 0.0, 0.0));
                 }
             }
+            // load entities
+            for(auto &filename: scene["entities"])
+            {
+                // currently we handle only yml
+                if(getFilenameSuffix(filename["file"]) == ".yml")
+                {
+                    const auto frameName = filename.hasKey("name") ? filename["name"].toString() : filename["file"].toString();
+                    loadYamlMarsScene(path, filename["file"], frameName, Vector(0.0, 0.0, 0.0), Quaternion(1.0, 0.0, 0.0, 0.0));
+                }
+            }
         }
 
         void MarsSceneLoader::loadSmurfScene(const std::string &filePath, std::string robotname,
