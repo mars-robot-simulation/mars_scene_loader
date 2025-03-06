@@ -130,6 +130,7 @@ namespace mars
 
             // parse the smurfs entries and load them
             configmaps::ConfigVector::iterator it;
+            // todo: in some defintion a smurfs file can have smurfs as key, this should be handled here as well
             for (it = smurfsMap["entities"].begin(); it != smurfsMap["entities"].end(); ++it)
             {
                 auto entityFile = (*it)["file"].toString();
@@ -224,7 +225,7 @@ namespace mars
                     return false;
                 }
             }
-
+            loadConfiguration(path, smurfsMap);
             std::string out_dot_file = "test.dot";
             envire::core::GraphDrawing::write(*(ControlCenter::envireGraph), out_dot_file);
 
@@ -283,6 +284,7 @@ namespace mars
                     loadYamlMarsScene(path, filename["file"], frameName, Vector(0.0, 0.0, 0.0), Quaternion(1.0, 0.0, 0.0, 0.0));
                 }
             }
+
             // load entities
             for(auto &filename: scene["entities"])
             {
