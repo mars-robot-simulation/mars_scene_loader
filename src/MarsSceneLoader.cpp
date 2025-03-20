@@ -419,6 +419,7 @@ namespace mars
             configmaps::ConfigMap worldMap;
             worldMap["name"] = worldFrame;
             worldMap["prefix"] = prefix;
+            worldMap["rootFolder"] = path;
             std::string className(base_types_namespace + std::string("World"));
             envire::core::ItemBase::Ptr item = envire::types::TypeCreatorFactory::createItem(className, worldMap);
             ControlCenter::envireGraph->addItemToFrame(worldFrame, item);
