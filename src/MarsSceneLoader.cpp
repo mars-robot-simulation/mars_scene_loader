@@ -142,10 +142,14 @@ namespace mars
                 absoluteEntityFilePath = utils::pathJoin(absoluteEntityFilePath, entityFileName);
                 std::cout << "--- Load: " << std::endl;
                 std::cout << "absoluteEntityFilePath: " << absoluteEntityFilePath << std::endl;
-                std::string robotname, anchor, pose;
+                std::string robotname, anchor, pose, worldname = "";
                 if(it->hasKey("name"))
                 {
                     robotname = (*it)["name"].toString();
+                }
+                if(it->hasKey("world"))
+                {
+                    worldname = (*it)["world"].toString();
                 }
                 if(it->hasKey("anchor"))
                 {
@@ -211,7 +215,7 @@ namespace mars
                 else if(entityFileExtension == ".smurf")
                 {
                     std::cout << "load SMURF" << std::endl;
-                    loadSmurfScene(absoluteEntityFilePath, robotname, pos, rot, anchor, pose);
+                    loadSmurfScene(absoluteEntityFilePath, robotname, worldname, pos, rot, anchor, pose);
                 }
                 else if(entityFileExtension == ".yml")
                 {
@@ -224,11 +228,23 @@ namespace mars
                     LOG_ERROR("%s", errmsg.c_str());
                     return false;
                 }
+                if(it->hasKey("connect"))
+                {
+                    for(auto it2: (*it)["connect"])
+                    {
+                        std::string name1 = it2["name1"];
+                        std::string name2 = "";
+                        if(it2.hasKey("name2"))
+                        {
+                            name2 << it2["name2"];
+                        }
+                        sim->connectDynamicObjects(name1, name2);
+                    }
+                }
             }
             loadConfiguration(path, smurfsMap);
-            std::string out_dot_file = "test.dot";
-            envire::core::GraphDrawing::write(*(ControlCenter::envireGraph), out_dot_file);
-
+            //std::string out_dot_file = "test.dot";
+            //envire::core::GraphDrawing::write(*(ControlCenter::envireGraph), out_dot_file);
             return true;
         }
 
@@ -297,7 +313,7 @@ namespace mars
             }
         }
 
-        void MarsSceneLoader::loadSmurfScene(const std::string &filePath, std::string robotname,
+        void MarsSceneLoader::loadSmurfScene(const std::string &filePath, std::string robotname, std::string worldname,
                                              utils::Vector pos, utils::Quaternion rot, std::string anchor, std::string pose)
         {
             // if(robotname.empty())
@@ -316,7 +332,7 @@ namespace mars
                 // ########################################## test loading of graph
                 // load example robot
                 envire::smurf_loader::Model model;
-                model.loadFromSmurf(ControlCenter::envireGraph, parentFrameId, filePath, pos, rot, prefix);
+                model.loadFromSmurf(ControlCenter::envireGraph, parentFrameId, filePath, pos, rot, prefix, worldname);
 
                 // todo: to this point the absolute poses are not calculated, which should be done on an addedTransform handler in the AbsolutePoseExtender
                 const VertexDesc originDesc = ControlCenter::envireGraph->vertex(SIM_CENTER_FRAME_NAME);
